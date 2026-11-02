@@ -1,0 +1,13 @@
+import {spawnSync} from 'node:child_process';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import path from 'node:path';
+const generated=JSON.parse(readFileSync('dist/server/wrangler.json','utf8'));
+const database=generated.d1_databases?.find(d=>d.binding==='DB');
+if(!database)throw Error('Build the D1-enabled app first.');
+mkdirSync('.sites-runtime',{recursive:true});
+const config={name:'bituach-beklik-local-migrations',compatibility_date:generated.compatibility_date,d1_databases:[{...database,migrations_dir:path.resolve('drizzle')}]};
+writeFileSync('.sites-runtime/local-migrations.json',JSON.stringify(config,null,2));
+const state=process.env.LOCAL_D1_STATE||'.wrangler/state';
+const result=spawnSync(process.execPath,['--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js','d1','migrations','apply','DB','--local','--config','.sites-runtime/local-migrations.json','--persist-to',state],{stdio:'inherit',windowsHide:true});
+if(result.error)throw result.error;
+process.exitCode=result.status??1;
